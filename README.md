@@ -20,20 +20,20 @@ csv_filename: str          # название для сохраняемого ф
 
 | Column                   | Type           | Description                      |
 |-------------------------|----------------|----------------------------------|
-| `repo_name`             | `str`          | Name of the GitHub repository    |
-| `base_commit_ids`       | `List[str]`    | IDs of base commits              |
-| `base_commit_dates`     | `List[str]`    | Dates of base commits            |
-| `pr_num`                | `int`          | Pull request number              |
-| `resolved_commit_id`    | `str`          | Merge commit ID                  |
-| `changed_file_list`     | `List[List[str]]` | List of changed files for each commit |
-| `num_changed_files`     | `List[int]`    | Number of files changed          |
-| `pr_close_date`         | `None`         | (To be filled later)             |
-| `pr_open_date`          | `None`         | (To be filled later)             |
-| `_pr_description`       | `str`         | (To be filled later)             |
-| `linked_issue_nums`     | `None`         | (To be filled later)             |
-| `_linked_issue_desc`    | `None`         | (To be filled later)             |
-| `linked_issue_date_open`  | `None`       | (To be filled later)             |
-| `linked_issue_date_closed`| `None`       | (To be filled later)             |
+| `repo_name`             | `str`          | Название репо    |
+| `base_commit_ids`       | `List[str]`    | ID базовых коммитов             |
+| `base_commit_dates`     | `List[str]`    | Даты базовых коммитов            |
+| `pr_num`                | `int`          | Номер pull-request             |
+| `resolved_commit_id`    | `str`          | ID смердженных коммитов          |
+| `changed_file_list`     | `List[List[str]]` | Список измененных файлов для каждого базового коммита |
+| `num_changed_files`     | `List[int]`    | Список кол-ва измененных файлов         |
+| `pr_close_date`         | `None`         | Placeholder, заполняется потом датой закрытия PR           |
+| `pr_open_date`          | `None`         | Placeholder, заполняется потом датой открытия PR              |
+| `_pr_description`       | `str`          | Placeholder, заполняется потом описанием PR            |
+| `linked_issue_nums`     | `None`         | Placeholder, заполняется потом номерами связанных issue с базовыми коммитами            |
+| `_linked_issue_desc`    | `None`         | Placeholder, заполняется потом списком текста из связанных issues              |
+| `linked_issue_date_open`  | `None`       | Placeholder, заполняется потом датой открытия issue              |
+| `linked_issue_date_closed`| `None`       | Placeholder, заполняется потом датой закрытия issue           |
 
     
   ## update_dataframe(csv_filename) - обогащение исходника информацией про связанные issue через REST API Git
