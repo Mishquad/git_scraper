@@ -13,7 +13,7 @@ A Python tool to extract and enrich **merge commits** and related **GitHub issue
 ```python
 repo_list: List[str]       # List of GitHub repositories to scan
 start_date: str            # Starting date (YYYY-MM-DD) for collecting merge commits
-
+```
 
     for repo_name:
       for resolved_base_commit:
