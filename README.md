@@ -11,8 +11,9 @@ A Python tool to extract and enrich **merge commits** and related **GitHub issue
 ## Input
 
 ```python
-repo_list: List[str]       # List of GitHub repositories to scan
-start_date: str            # Starting date (YYYY-MM-DD) for collecting merge commits
+repo_list: List[str]       # список репо для поиска коммитов
+start_date: str            # календарная дата, с которой искать коммиты
+csv_filename: str          # название для сохраняемого файла
 ```
 
 ## initialize_csv - создание .csv файла с построчной записью 
