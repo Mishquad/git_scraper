@@ -55,7 +55,7 @@ csv_filename: str          # название для сохраняемого ф
 
  ## explode - создаем уникальный ключ base_commit_id + resolving_commit_id
     
-| Field                     | Type            |
+| Column                     | Type            |
 |---------------------------|-----------------|
 | `repo_name`               | `str`           |
 | `base_commit`             | `str`           |
