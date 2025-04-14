@@ -6,6 +6,16 @@ import requests
 import pandas as pd
 import csv
 from typing import List, Tuple, Optional
+import time
+import ast
+import shutil
+import stat
+
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+
+class GitHubRateLimitExceeded(Exception):
+    pass
+
 
 def run_git_command(repo_path: str, command: List[str]) -> Optional[str]:
     """
@@ -26,6 +36,7 @@ def run_git_command(repo_path: str, command: List[str]) -> Optional[str]:
     except subprocess.CalledProcessError as e:
         logging.error(f"Git command failed: {' '.join(command)}: {e}")
         return None
+
 
 def clone_repo_if_needed(repo_name: str, base_path: str = "repos") -> Optional[str]:
     """
@@ -50,6 +61,7 @@ def clone_repo_if_needed(repo_name: str, base_path: str = "repos") -> Optional[s
             return None
     return repo_path
 
+
 def get_merge_commits(repo_path: str, start_date: Optional[str] = None) -> List[Tuple[str, str]]:
     """
     Retrieves a list of merge commits from the Git repository.
@@ -68,6 +80,7 @@ def get_merge_commits(repo_path: str, start_date: Optional[str] = None) -> List[
     output = run_git_command(repo_path, command)
     return [(line.split()[0], ' '.join(line.split()[1:])) for line in output.split('\n') if line] if output else []
 
+
 def get_parent_commits(repo_path: str, merge_commit: str) -> List[str]:
     """
     Retrieves the parent commits of a merge commit.
@@ -85,6 +98,7 @@ def get_parent_commits(repo_path: str, merge_commit: str) -> List[str]:
         return parts[1:] if len(parts) > 2 else []
     return []
 
+
 def get_commit_date(repo_path: str, commit_hash: str) -> str:
     """
     Retrieves the date of a specific commit.
@@ -97,6 +111,7 @@ def get_commit_date(repo_path: str, commit_hash: str) -> str:
         str: The commit date, or "Unknown" if not found.
     """
     return run_git_command(repo_path, ['show', '-s', '--format=%ci', commit_hash]) or "Unknown"
+
 
 def get_issues_from_pr(repo_path: str, merge_commit: str) -> Optional[str]:
     """
@@ -113,6 +128,7 @@ def get_issues_from_pr(repo_path: str, merge_commit: str) -> Optional[str]:
     match = re.search(r'(?:fixes|closes|resolves)?\s*#(\d+)', output, re.IGNORECASE) if output else None
     return match.group(1) if match else None
 
+
 def get_changed_files(repo_path: str, parent_commit: str, merge_commit: str) -> List[str]:
     """
     Retrieves the list of changed files between a parent commit and a merge commit.
@@ -128,6 +144,7 @@ def get_changed_files(repo_path: str, parent_commit: str, merge_commit: str) -> 
     output = run_git_command(repo_path, ['diff', '--name-only', f"{parent_commit}..{merge_commit}"])
     return output.split("\n") if output else []
 
+
 def get_pr_description(repo_path: str, merge_commit: str) -> str:
     """
     Retrieves the pull request description from the commit message.
@@ -141,6 +158,7 @@ def get_pr_description(repo_path: str, merge_commit: str) -> str:
     """
     output = run_git_command(repo_path, ['log', '-1', '--pretty=%B', merge_commit])
     return output.strip() if output else "No description"
+
 
 def get_pr_dates(repo_name: str, pr_number: int) -> Tuple[str, str]:
     """
@@ -159,14 +177,23 @@ def get_pr_dates(repo_name: str, pr_number: int) -> Tuple[str, str]:
         "Authorization": f"token {GITHUB_TOKEN}"
     }
 
-    response = requests.get(url, headers=headers)
+    while True:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 403 and response.headers.get("X-RateLimit-Remaining") == "0":
+            reset_time = int(response.headers.get("X-RateLimit-Reset", 0))
+            sleep_seconds = max(reset_time - int(time.time()), 0) + 1
+            logging.warning(f"Rate limit exceeded. Sleeping for {sleep_seconds} seconds...")
+            time.sleep(sleep_seconds)
+            continue
+        break
 
     if response.status_code == 200:
         data = response.json()
         return data.get("created_at", ""), data.get("closed_at", "")
     else:
-        logging.warning(f"Failed to fetch PR {pr_number} from {repo_name}")
+        logging.warning(f"Failed to fetch PR {pr_number} from {repo_name} with status {response.status_code}")
         return "", ""
+
 
 def get_linked_issues(repo_name: str, pr_number: int) -> List[str]:
     """
@@ -185,19 +212,22 @@ def get_linked_issues(repo_name: str, pr_number: int) -> List[str]:
         "Authorization": f"token {GITHUB_TOKEN}"
     }
 
-    response = requests.get(url, headers=headers)
+    while True:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 403 and response.headers.get("X-RateLimit-Remaining") == "0":
+            reset_time = int(response.headers.get("X-RateLimit-Reset", 0))
+            sleep_seconds = max(reset_time - int(time.time()), 0) + 1
+            logging.warning(f"Rate limit exceeded. Sleeping for {sleep_seconds} seconds...")
+            time.sleep(sleep_seconds)
+            continue
+        break
 
     if response.status_code == 200:
         data = response.json()
         pr_body = data.get("body", "")
-
-        # Find issue references like "fixes #123", "closes #456"
-        issue_numbers = re.findall(r"(?:fixes|closes|resolves)\s+#(\d+)", pr_body, re.IGNORECASE)
-        
-        # Remove incorrect "1234" example
+        issue_numbers = re.findall(r"(?:fixes|closes|resolves)\s+#(\d+)", str(pr_body), re.IGNORECASE)
         issue_numbers = [num for num in issue_numbers if num != "1234"]
-
-        return list(set(issue_numbers))  # Remove duplicates
+        return list(set(issue_numbers))
     else:
         logging.warning(f"Failed to fetch PR {pr_number} from {repo_name}")
         return []
@@ -219,14 +249,22 @@ def get_issue_details(repo_name: str, issue_number: int) -> Tuple[str, str, str]
         "Authorization": f"token {GITHUB_TOKEN}"
     }
 
-    response = requests.get(url, headers=headers)
+    while True:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 403 and response.headers.get("X-RateLimit-Remaining") == "0":
+            reset_time = int(response.headers.get("X-RateLimit-Reset", 0))
+            sleep_seconds = max(reset_time - int(time.time()), 0) + 1
+            logging.warning(f"Rate limit exceeded. Sleeping for {sleep_seconds} seconds...")
+            time.sleep(sleep_seconds)
+            continue
+        break
 
     if response.status_code == 200:
         data = response.json()
         return (
-            data.get("created_at", ""),  # Open date
-            data.get("closed_at", ""),   # Close date
-            data.get("body", "No description")  # Description
+            data.get("created_at", ""),
+            data.get("closed_at", ""),
+            data.get("body", "No description")
         )
     else:
         logging.warning(f"Failed to fetch issue {issue_number} from {repo_name}")
@@ -249,7 +287,15 @@ def get_issue_description(repo_name: str, issue_number: int) -> str:
         "Authorization": f"token {GITHUB_TOKEN}"
     }
 
-    response = requests.get(url, headers=headers)
+    while True:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 403 and response.headers.get("X-RateLimit-Remaining") == "0":
+            reset_time = int(response.headers.get("X-RateLimit-Reset", 0))
+            sleep_seconds = max(reset_time - int(time.time()), 0) + 1
+            logging.warning(f"Rate limit exceeded. Sleeping for {sleep_seconds} seconds...")
+            time.sleep(sleep_seconds)
+            continue
+        break
 
     if response.status_code == 200:
         data = response.json()
@@ -299,6 +345,10 @@ def update_dataframe(csv_filename: str) -> None:
 
     df.to_csv(csv_filename, index=False)
     print(f"Updated issue and PR data saved in {csv_filename}")
+
+def handle_remove_readonly(func, path, exc):
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
 
 def process_repo(repo_name: str, issues_data: dict, csv_filename: str, base_path: str = "repos", start_date: Optional[str] = None) -> None:
     """
@@ -351,6 +401,11 @@ def process_repo(repo_name: str, issues_data: dict, csv_filename: str, base_path
             
             writer.writerow(row)  
             logging.info(f"Saved row: {row}")
+   
+    if os.path.exists(repo_path):
+        shutil.rmtree(repo_path, onerror=handle_remove_readonly)
+        logging.info(f"Deleted cloned repo at {repo_path} to save space")
+
 
 def initialize_csv(filename: str) -> None:
     """
@@ -370,15 +425,47 @@ def initialize_csv(filename: str) -> None:
                 '_linked_issue_desc', '_pr_description', 'linked_issue_date_open', 'linked_issue_date_closed'
             ])
 
+
+def explode_base_commits(df: pd.DataFrame) -> pd.DataFrame:
+    # Колонки, которые могут быть сериализованы как строки и являются списками списков
+    list_cols = ['base_commit_ids', 'base_commit_dates', 'num_changed_files', 'changed_files_list']
+    
+    # Преобразуем строки в списки (если это строки)
+    for col in list_cols:
+        df[col] = df[col].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+    
+    # Создаём список новых строк
+    rows = []
+    for _, row in df.iterrows():
+        base_commits = row['base_commit_ids']
+        base_dates = row['base_commit_dates']
+        num_files = row['num_changed_files']
+        files_list = row['changed_files_list']
+
+        for i in range(len(base_commits)):
+            new_row = row.copy()
+            new_row['base_commit'] = base_commits[i]
+            new_row['base_commit_date'] = base_dates[i] if i < len(base_dates) else None
+            new_row['num_changed_files'] = num_files[i] if i < len(num_files) else None
+            new_row['changed_files_list'] = files_list[i] if i < len(files_list) else None
+            rows.append(new_row)
+
+    # Создаём DataFrame и удаляем старые списочные колонки
+    exploded_df = pd.DataFrame(rows)
+    exploded_df = exploded_df.drop(columns=['base_commit_ids', 'base_commit_dates'])
+
+    return exploded_df
+
+
 def main() -> None:
     """
     The main function to process repositories and update issue and PR data in a CSV file.
     """
     logging.basicConfig(level=logging.INFO)
-    repo_list = ['sympy/sympy']
+    repo_list = ["sympy/sympy"]
     issues_data = {}
     start_date = '2025-01-01'  
-    csv_filename = 'sympy_sympy_commits_001.csv'
+    csv_filename = 'df_sympy_last_test.csv'
 
     initialize_csv(csv_filename)
 
@@ -388,6 +475,9 @@ def main() -> None:
     logging.info(f"Processing complete! Data saved in {csv_filename}, now will try to get issues description")
     update_dataframe(csv_filename)
     logging.info(f"Finished collecting issue description")
+    logging.info(f"Exploding dataframe")
+    explode_base_commits(pd.read_csv(csv_filename)).to_csv(f'exploded_{csv_filename}', index = False)
+    
 
 if __name__ == '__main__':
     main()
