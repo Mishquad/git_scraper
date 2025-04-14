@@ -23,9 +23,9 @@ csv_filename: str          # название для сохраняемого ф
 | `resolved_commit_id`    | `str`          | ID смердженных коммитов          |
 | `changed_file_list`     | `List[List[str]]` | Список измененных файлов для каждого базового коммита |
 | `num_changed_files`     | `List[int]`    | Список кол-ва измененных файлов         |
+| `_pr_description`       | `str`          | Заполняется описанием PR            |
 | `pr_close_date`         | `None`         | Placeholder, заполняется потом датой закрытия PR           |
 | `pr_open_date`          | `None`         | Placeholder, заполняется потом датой открытия PR              |
-| `_pr_description`       | `str`          | Placeholder, заполняется потом описанием PR            |
 | `linked_issue_nums`     | `None`         | Placeholder, заполняется потом номерами связанных issue с базовыми коммитами            |
 | `_linked_issue_desc`    | `None`         | Placeholder, заполняется потом списком текста из связанных issues              |
 | `linked_issue_date_open`  | `None`       | Placeholder, заполняется потом датой открытия issue              |
