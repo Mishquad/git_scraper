@@ -1,10 +1,6 @@
 # git_scraper
 
-
-
-# git_scraper
-
-A Python tool to extract and enrich **merge commits** and related **GitHub issues** from a list of repositories.
+Инструмент для извлечения merged commits из нужных репозиториев
 
 ---
 
