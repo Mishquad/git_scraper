@@ -427,14 +427,24 @@ def initialize_csv(filename: str) -> None:
 
 
 def explode_base_commits(df: pd.DataFrame) -> pd.DataFrame:
-    # Колонки, которые могут быть сериализованы как строки и являются списками списков
+    if df.empty:
+        logging.warning("Input DataFrame is empty. Skipping explosion.")
+        return df
+
+    # Columns that need to be deserialized
     list_cols = ['base_commit_ids', 'base_commit_dates', 'num_changed_files', 'changed_files_list']
     
-    # Преобразуем строки в списки (если это строки)
+    # Check if all required columns are present
+    missing_cols = [col for col in list_cols if col not in df.columns]
+    if missing_cols:
+        logging.warning(f"Missing columns in input DataFrame: {missing_cols}. Skipping explosion.")
+        return df
+
+    # Convert strings to Python lists
     for col in list_cols:
         df[col] = df[col].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
     
-    # Создаём список новых строк
+    # Explode each row into multiple rows
     rows = []
     for _, row in df.iterrows():
         base_commits = row['base_commit_ids']
@@ -450,11 +460,14 @@ def explode_base_commits(df: pd.DataFrame) -> pd.DataFrame:
             new_row['changed_files_list'] = files_list[i] if i < len(files_list) else None
             rows.append(new_row)
 
-    # Создаём DataFrame и удаляем старые списочные колонки
-    exploded_df = pd.DataFrame(rows)
-    exploded_df = exploded_df.drop(columns=['base_commit_ids', 'base_commit_dates'])
-
-    return exploded_df
+    # Build the exploded DataFrame
+    if rows:
+        exploded_df = pd.DataFrame(rows)
+        exploded_df = exploded_df.drop(columns=['base_commit_ids', 'base_commit_dates'])
+        return exploded_df
+    else:
+        logging.warning("No rows generated after explosion.")
+        return pd.DataFrame(columns=df.columns.tolist() + ['base_commit', 'base_commit_date'])
 
 
 def main() -> None:
